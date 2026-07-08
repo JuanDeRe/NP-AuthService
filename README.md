@@ -1,5 +1,7 @@
 ﻿# Nightwatch Protocol
 
+https://github.com/JuanDeRe/NP-AuthService/actions/workflows/ci.yml/badge.svg](https://github.com/JuanDeRe/NP-AuthService/actions/workflows/ci.yml)
+
 **Nightwatch Protocol** es un proyecto académico para la materia de Arquitecturas de Software. La aplicación consiste en un juego multijugador de terror asimétrico en tiempo real, donde un jugador toma el rol de vigilante nocturno y otros jugadores controlan animatrónicos que intentan llegar a la oficina y ejecutar un ataque exitoso.
 
 El proyecto busca demostrar una arquitectura distribuida, orientada a concurrencia, sincronización en tiempo real, escalabilidad y observabilidad.
