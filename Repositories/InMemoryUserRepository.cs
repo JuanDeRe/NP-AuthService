@@ -12,6 +12,20 @@ public class InMemoryUserRepository : IUserRepository
             Username = "juan",
             Password = "1234",
             Role = "player"
+        }, 
+        new AuthenticatedUser
+        {
+            UserId = "player-002",
+            Username = "pepe",
+            Password = "1234",
+            Role = "player"
+        },
+        new AuthenticatedUser
+        {
+            UserId = "player-003",
+            Username = "mark",
+            Password = "1234",
+            Role = "player"
         },
         new AuthenticatedUser
         {
