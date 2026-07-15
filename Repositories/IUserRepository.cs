@@ -4,5 +4,13 @@ namespace AuthService.Repositories;
 
 public interface IUserRepository
 {
-    AuthenticatedUser? GetByUsername(string username);
+    Task<UserAccount?> GetByUsernameAsync(
+        string normalizedUsername,
+        CancellationToken cancellationToken = default
+    );
+
+    Task<bool> CreateAsync(
+        UserAccount user,
+        CancellationToken cancellationToken = default
+    );
 }

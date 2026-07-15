@@ -4,5 +4,13 @@ namespace AuthService.Services;
 
 public interface IAuthService
 {
-    LoginResponse? Login(LoginRequest request);
+    Task<LoginResponse?> LoginAsync(
+        LoginRequest request,
+        CancellationToken cancellationToken = default
+    );
+
+    Task<RegisterResponse> RegisterAsync(
+        RegisterRequest request,
+        CancellationToken cancellationToken = default
+    );
 }

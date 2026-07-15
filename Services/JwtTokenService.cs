@@ -17,13 +17,26 @@ public class JwtTokenService : IJwtTokenService
         _jwtOptions = jwtOptions.Value;
     }
 
-    public string GenerateToken(AuthenticatedUser user)
+    public string GenerateToken(UserAccount user)
     {
-        var claims = new List<Claim>
+        var claims = new[]
         {
-            new(ClaimTypes.NameIdentifier, user.UserId),
-            new(ClaimTypes.Name, user.Username),
-            new(ClaimTypes.Role, user.Role)
+            new Claim(
+                JwtRegisteredClaimNames.Sub,
+                user.PlayerId
+            ),
+            new Claim(
+                ClaimTypes.NameIdentifier,
+                user.PlayerId
+            ),
+            new Claim(
+                ClaimTypes.Name,
+                user.Username
+            ),
+            new Claim(
+                ClaimTypes.Role,
+                user.Role
+            )
         };
 
         var key = new SymmetricSecurityKey(

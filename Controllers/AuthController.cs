@@ -1,9 +1,7 @@
-﻿using System.Security.Claims;
-using AuthService.Models;
+﻿using AuthService.Models;
 using AuthService.Services;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
+using AuthService.Exceptions;
 namespace AuthService.Controllers;
 
 [ApiController]
@@ -17,45 +15,73 @@ public class AuthController : ControllerBase
         _authService = authService;
     }
 
-    [HttpPost("login")]
-    public ActionResult<LoginResponse> Login([FromBody] LoginRequest request)
+    [HttpPost("register")]
+    public async Task<ActionResult<RegisterResponse>> Register(
+        [FromBody] RegisterRequest request,
+        CancellationToken cancellationToken)
     {
-        var response = _authService.Login(request);
+        try
+        {
+            var response = await _authService.RegisterAsync(
+                request,
+                cancellationToken
+            );
+
+            return StatusCode(
+                StatusCodes.Status201Created,
+                response
+            );
+        }
+        catch (UsernameAlreadyExistsException exception)
+        {
+            return Conflict(new
+            {
+                message = exception.Message
+            });
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new
+            {
+                message = exception.Message
+            });
+        }
+    }
+
+    [HttpPost("login")]
+    public async Task<ActionResult<LoginResponse>> Login(
+        [FromBody] LoginRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Username))
+        {
+            return BadRequest(new
+            {
+                message = "Username is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Password))
+        {
+            return BadRequest(new
+            {
+                message = "Password is required."
+            });
+        }
+
+        var response = await _authService.LoginAsync(
+            request,
+            cancellationToken
+        );
 
         if (response is null)
         {
             return Unauthorized(new
             {
-                message = "Invalid username or password"
+                message = "Invalid username or password."
             });
         }
 
         return Ok(response);
-    }
-
-    [Authorize]
-    [HttpGet("me")]
-    public IActionResult Me()
-    {
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        var username = User.FindFirst(ClaimTypes.Name)?.Value;
-        var role = User.FindFirst(ClaimTypes.Role)?.Value;
-
-        return Ok(new
-        {
-            userId,
-            username,
-            role
-        });
-    }
-
-    [Authorize(Roles = "admin")]
-    [HttpGet("admin-check")]
-    public IActionResult AdminCheck()
-    {
-        return Ok(new
-        {
-            message = "Admin access granted"
-        });
     }
 }
