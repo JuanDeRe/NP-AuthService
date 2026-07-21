@@ -25,7 +25,14 @@ var jwtOptions = builder.Configuration
     ?? throw new InvalidOperationException(
         "JWT configuration is missing."
     );
+var allowedOrigins =
+    builder.Configuration
+        .GetSection("Cors:AllowedOrigins")
+        .Get<string[]>()
+    ?? Array.Empty<string>();
 
+const string unityClientCorsPolicy =
+    "UnityClientCorsPolicy";
 // DynamoDB
 builder.Services.Configure<DynamoDbOptions>(
     builder.Configuration.GetSection("DynamoDb")
@@ -35,13 +42,56 @@ builder.Services.AddControllers();
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("UnityWebClient", policy =>
-    {
-        policy
-            .AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
+    options.AddPolicy(
+        unityClientCorsPolicy,
+        policy =>
+        {
+            policy
+                .SetIsOriginAllowed(origin =>
+                {
+                    if (string.IsNullOrWhiteSpace(origin))
+                    {
+                        return false;
+                    }
+
+                    if (!Uri.TryCreate(
+                            origin,
+                            UriKind.Absolute,
+                            out var uri))
+                    {
+                        return false;
+                    }
+
+                    var isLocalDevelopment =
+                        uri.Host.Equals(
+                            "localhost",
+                            StringComparison.OrdinalIgnoreCase
+                        ) ||
+                        uri.Host.Equals(
+                            "127.0.0.1",
+                            StringComparison.OrdinalIgnoreCase
+                        );
+
+                    var normalizedOrigin =
+                        origin.TrimEnd('/');
+
+                    var isConfiguredOrigin =
+                        allowedOrigins.Any(
+                            allowedOrigin =>
+                                string.Equals(
+                                    allowedOrigin.TrimEnd('/'),
+                                    normalizedOrigin,
+                                    StringComparison.OrdinalIgnoreCase
+                                )
+                        );
+
+                    return isLocalDevelopment ||
+                           isConfiguredOrigin;
+                })
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
+    );
 });
 
 // Authentication
@@ -170,7 +220,7 @@ using (var scope = app.Services.CreateScope())
     await initializer.InitializeAsync();
 }
 
-app.UseCors("UnityWebClient");
+app.UseCors(unityClientCorsPolicy);
 
 app.UseAuthentication();
 app.UseAuthorization();
