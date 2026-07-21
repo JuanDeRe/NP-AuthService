@@ -9,6 +9,8 @@ using AuthService.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
+using Amazon.CloudWatch;
+using AuthService.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -132,6 +134,25 @@ builder.Services.AddSingleton<
 
 builder.Services.AddSingleton<
     DynamoDbTableInitializer
+>();
+
+builder.Services.Configure<AuthMetricsOptions>(
+    builder.Configuration.GetSection(
+        AuthMetricsOptions.SectionName
+    )
+);
+
+builder.Services.AddSingleton<
+    IAuthMetrics,
+    AuthMetrics
+>();
+
+builder.Services.AddSingleton<IAmazonCloudWatch>(
+    _ => new AmazonCloudWatchClient()
+);
+
+builder.Services.AddHostedService<
+    CloudWatchAuthMetricsPublisher
 >();
 
 builder.Services.AddHealthChecks();

@@ -2,6 +2,9 @@
 using AuthService.Services;
 using Microsoft.AspNetCore.Mvc;
 using AuthService.Exceptions;
+using System.Diagnostics;
+using AuthService.Observability;
+
 namespace AuthService.Controllers;
 
 [ApiController]
@@ -9,10 +12,14 @@ namespace AuthService.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IAuthMetrics _metrics;
 
-    public AuthController(IAuthService authService)
+    public AuthController(
+        IAuthService authService,
+        IAuthMetrics metrics)
     {
         _authService = authService;
+        _metrics = metrics;
     }
 
     [HttpPost("register")]
@@ -20,6 +27,7 @@ public class AuthController : ControllerBase
         [FromBody] RegisterRequest request,
         CancellationToken cancellationToken)
     {
+        _metrics.RecordRegistrationAttempt();
         try
         {
             var response = await _authService.RegisterAsync(
@@ -34,6 +42,7 @@ public class AuthController : ControllerBase
         }
         catch (UsernameAlreadyExistsException exception)
         {
+            _metrics.RecordRegistrationFailure();
             return Conflict(new
             {
                 message = exception.Message
@@ -41,10 +50,16 @@ public class AuthController : ControllerBase
         }
         catch (ArgumentException exception)
         {
+            _metrics.RecordRegistrationFailure();
             return BadRequest(new
             {
                 message = exception.Message
             });
+        }
+        catch
+        {
+            _metrics.RecordRegistrationFailure();
+            throw;
         }
     }
 
@@ -53,35 +68,65 @@ public class AuthController : ControllerBase
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Username))
+        _metrics.RecordLoginAttempt();
+
+        var stopwatch = Stopwatch.StartNew();
+
+        try
         {
-            return BadRequest(new
+            if (string.IsNullOrWhiteSpace(
+                    request.Username))
             {
-                message = "Username is required."
-            });
-        }
+                _metrics.RecordLoginFailure();
 
-        if (string.IsNullOrWhiteSpace(request.Password))
+                return BadRequest(new
+                {
+                    message = "Username is required."
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    request.Password))
+            {
+                _metrics.RecordLoginFailure();
+
+                return BadRequest(new
+                {
+                    message = "Password is required."
+                });
+            }
+
+            var response =
+                await _authService.LoginAsync(
+                    request,
+                    cancellationToken
+                );
+
+            if (response is null)
+            {
+                _metrics.RecordLoginFailure();
+
+                return Unauthorized(new
+                {
+                    message =
+                        "Invalid username or password."
+                });
+            }
+
+            return Ok(response);
+        }
+        catch
         {
-            return BadRequest(new
-            {
-                message = "Password is required."
-            });
+            _metrics.RecordLoginFailure();
+            throw;
         }
-
-        var response = await _authService.LoginAsync(
-            request,
-            cancellationToken
-        );
-
-        if (response is null)
+        finally
         {
-            return Unauthorized(new
-            {
-                message = "Invalid username or password."
-            });
-        }
+            stopwatch.Stop();
 
-        return Ok(response);
+            _metrics.RecordAuthenticationLatency(
+                stopwatch.Elapsed.TotalMilliseconds
+            );
+        }
     }
 }

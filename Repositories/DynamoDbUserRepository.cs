@@ -3,6 +3,7 @@ using Amazon.DynamoDBv2.Model;
 using AuthService.Configuration;
 using AuthService.Models;
 using Microsoft.Extensions.Options;
+using AuthService.Observability;
 
 namespace AuthService.Repositories;
 
@@ -13,36 +14,48 @@ public class DynamoDbUserRepository : IUserRepository
 {
     private readonly IAmazonDynamoDB _dynamoDb;
     private readonly DynamoDbOptions _options;
+    private readonly IAuthMetrics _metrics;
 
     public DynamoDbUserRepository(
         IAmazonDynamoDB dynamoDb,
-        IOptions<DynamoDbOptions> options)
+        IOptions<DynamoDbOptions> options,
+        IAuthMetrics metrics)
     {
         _dynamoDb = dynamoDb;
         _options = options.Value;
+        _metrics = metrics;
     }
 
     public async Task<UserAccount?> GetByUsernameAsync(
         string normalizedUsername,
         CancellationToken cancellationToken = default)
     {
-        var response = await _dynamoDb.GetItemAsync(
-            new GetItemRequest
-            {
-                TableName = _options.TableName,
-
-                Key = new Dictionary<string, AttributeValue>
+        GetItemResponse response;
+        try
+        {
+            response = await _dynamoDb.GetItemAsync(
+                new GetItemRequest
                 {
-                    ["Username"] = new()
-                    {
-                        S = normalizedUsername
-                    }
-                },
+                    TableName = _options.TableName,
 
-                ConsistentRead = true
-            },
-            cancellationToken
-        );
+                    Key = new Dictionary<string, AttributeValue>
+                    {
+                        ["Username"] = new()
+                        {
+                            S = normalizedUsername
+                        }
+                    },
+
+                    ConsistentRead = true
+                },
+                cancellationToken
+            );
+        }
+        catch (AmazonDynamoDBException)
+        {
+            _metrics.RecordDynamoDbOperationFailure();
+            throw;
+        }
 
         if (response.Item is null ||
             response.Item.Count == 0)
@@ -106,6 +119,11 @@ public class DynamoDbUserRepository : IUserRepository
         catch (ConditionalCheckFailedException)
         {
             return false;
+        }
+        catch (AmazonDynamoDBException)
+        {
+            _metrics.RecordDynamoDbOperationFailure();
+            throw;
         }
     }
 
