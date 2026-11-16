@@ -1,54 +1,40 @@
-﻿# Nightwatch Protocol
+# 🔐 NP-AuthService
 
-https://github.com/JuanDeRe/NP-AuthService/actions/workflows/ci.yml/badge.svg](https://github.com/JuanDeRe/NP-AuthService/actions/workflows/ci.yml)
+[![CI](https://github.com/JuanDeRe/NP-AuthService/actions/workflows/ci.yml/badge.svg)](https://github.com/JuanDeRe/NP-AuthService/actions/workflows/ci.yml)
 
-**Nightwatch Protocol** es un proyecto académico para la materia de Arquitecturas de Software. La aplicación consiste en un juego multijugador de terror asimétrico en tiempo real, donde un jugador toma el rol de vigilante nocturno y otros jugadores controlan animatrónicos que intentan llegar a la oficina y ejecutar un ataque exitoso.
+Authentication microservice of [Nightwatch Protocol](https://github.com/Nightwatch-Protocol/nightwatch-protocol), a real-time asymmetric multiplayer horror game.
 
-El proyecto busca demostrar una arquitectura distribuida, orientada a concurrencia, sincronización en tiempo real, escalabilidad y observabilidad.
+## What it does
+- **Registers** players (`POST /auth/register`) and **logs them in** (`POST /auth/login`)
+- Hashes passwords with ASP.NET Core `PasswordHasher`
+- Issues **signed JWTs** (issuer, audience, expiration configurable) that Matchmaking and the Realtime Gateway rely on
+- Persists users in **Amazon DynamoDB** (table auto-created at startup; local DynamoDB supported for development)
+- Rejects duplicate usernames with a dedicated exception
+- Publishes **operational metrics** to CloudWatch (`Observability/`)
+- Exposes `/health` for load-balancer health checks
 
-## Arquitectura general
+## What was achieved
+Identity is established once at login and trusted across services: the same JWT signing configuration is shared with the Gateway, which validates it on every WebSocket connection. The service is stateless and deployed behind an ALB in an Auto Scaling Group.
 
-La solución está planteada como una arquitectura distribuida, cliente-servidor y basada en eventos.
+## Tech stack
+C# · .NET 9 · ASP.NET Core · JWT Bearer · DynamoDB (AWS SDK) · CloudWatch · Docker · GitHub Actions
 
-Componentes principales:
+## Run locally
+```bash
+# DynamoDB Local on :8000 (default dev config uses UseLocalMode=true)
+dotnet run
+```
 
-- **Cliente Unity/C#**: renderizado del juego, UI, input, audio e interpolación.
-- **Auth Service**: autenticación básica, generación de JWT y manejo de roles.
-- **Matchmaking Service**: cola de jugadores y asignación de partidas.
-- **Realtime Gateway**: manejo de conexiones WebSocket para gameplay en tiempo real.
-- **Game Service**: estado autoritativo de partidas, validación de acciones y reglas de juego.
-- **Observability Service**: monitoreo operativo, métricas, KPIs y dashboard administrativo.
-- **Redis / Event Bus**: coordinación temporal, estado de servidores y métricas operativas.
-- **PostgreSQL**: persistencia para autenticación y observabilidad.
+| Setting (env var) | Description |
+|---|---|
+| `Jwt__Key` | **Required in any real environment.** The value in `appsettings.json` is a dev-only placeholder |
+| `Jwt__Issuer`, `Jwt__Audience`, `Jwt__ExpirationMinutes` | Token settings |
+| `DynamoDb__TableName`, `DynamoDb__ServiceUrl`, `DynamoDb__UseLocalMode` | User table settings |
+| `Cors__AllowedOrigins__0` | Allowed web-client origin |
 
-## Estado actual del desarrollo
+## Notes / limitations
+- No automated tests in this repo yet (CI builds the project).
+- Roles are stored (`Player`); role-based authorization is not enforced on endpoints.
 
-Actualmente se está implementando el primer servicio backend:
-
-### Auth Service
-
-Servicio en **C#/.NET** encargado de:
-
-- Realizar login básico.
-- Generar tokens JWT.
-- Manejar roles de usuario (`player`, `admin`).
-- Exponer endpoints REST.
-- Preparar la base para integración futura con PostgreSQL.
-
-Por ahora, el repositorio de usuarios es en memoria para validar el flujo inicial. La estructura permite reemplazarlo posteriormente por una implementación con base de datos sin modificar la lógica principal de autenticación.
-
-## Estructura inicial
-
-```text
-NightwatchProtocol/
-│
-├── AuthService/
-│   ├── Configuration/
-│   ├── Controllers/
-│   ├── Models/
-│   ├── Repositories/
-│   ├── Services/
-│   ├── Program.cs
-│   └── appsettings.json
-│
-└── NightwatchProtocol.sln
+## Part of Nightwatch Protocol
+[Main repo](https://github.com/Nightwatch-Protocol/nightwatch-protocol) · [Unity Client](https://github.com/JuanDeRe/Nightwatch-Protocol-Unity-Client) · **Auth** · [Matchmaking](https://github.com/JuanDeRe/NP-MatchmakingService) · [Gateway](https://github.com/JuanDeRe/NP-RealtimeGateway) · [Game Service](https://github.com/JuanDeRe/NP-GameService) · [Terraform](https://github.com/JuanDeRe/NP-Terraform)
